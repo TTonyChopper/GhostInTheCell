@@ -99,6 +99,11 @@ class Player
                     break;
             }
         }
+        findMotherFact(newUniv.myArmy);
+        findMotherFact(newUniv.otherArmy);
+        findTargetFact(newUniv.myArmy);
+        findTargetFact(newUniv.otherArmy);
+        findTargetFact(newUniv.neutralArmy);
     }
 
     static void initEntityFact(Univ newUniv, int id, int owner, int residents, int prod)
@@ -108,10 +113,13 @@ class Player
         switch (id)
         {
             case -1:
+            	newUniv.otherArmy.factories.add(fact);
                 break;
             case 0:
+            	newUniv.neutralArmy.factories.add(fact);
                 break;
             case 1:
+            	newUniv.myArmy.factories.add(fact);
                 break;
         }
         fact.residents = residents;
@@ -122,18 +130,52 @@ class Player
     static void initEntityTroop(Univ newUniv, int id, int arg1, int arg2, int arg3, int arg4, int arg5)
     {
     }
+    
+    static void findMotherFact(PlayingArmy army)
+    {
+        int id = 0;
+        int max = 0;
+        for(Fact ownFact : army.factories)
+        {
+            if (ownFact.residents > max)
+            {
+                max = ownFact.residents;
+                id = ownFact.base.id;
+            }
+        }
+        army.motherFact = id;
+    }
+    
+    static void findTargetFact(Army army)
+    {
+        int id = 0;
+        int max = 0;
+        for(Fact ownFact : army.factories)
+        {
+            if (ownFact.prod > max)
+            {
+                max = ownFact.prod;
+                id = ownFact.base.id;
+            }
+        }
+        army.weakestFact = id;
+    }
 
     static void engage(Univ oldUniv, Univ newUniv)
     {
-
+        System.err.println("My "+newUniv.myArmy);
+        System.err.println("Opp"+newUniv.otherArmy);
+        System.err.println("Blk"+newUniv.neutralArmy);
+        
+        System.out.println("MOVE "+newUniv.myArmy.motherFact+" "+newUniv.neutralArmy.weakestFact+" "+(newUniv.gameFactoriesById.get(newUniv.myArmy.motherFact).residents-1));
     }
 }
 
 class Univ
 {
-    Army myArmy = new PlayingArmy();
-    Army otherArmy = new PlayingArmy();
-    Army neutralArmy = new Army();
+	PlayingArmy myArmy = new PlayingArmy(1);
+	PlayingArmy otherArmy = new PlayingArmy(-1);
+    Army neutralArmy = new Army(0);
     HashMap<Integer, Fact> gameFactoriesById = new HashMap<>(Player.MAX_FACT);
     HashMap<Integer, Integer> gameFactoriesProductionById = new HashMap<>(Player.MAX_FACT);
     int numFact;
@@ -187,8 +229,13 @@ class Univ
 class Army
 {
     int owner;
+    int weakestFact;
     ArrayList<Fact> factories = new ArrayList<>(Player.MAX_FACT);
 
+    Army(int owner)
+    {
+        this.owner = owner;
+    }
     public String toString()
     {
         return owner + " " + factories;
@@ -197,18 +244,23 @@ class Army
 
 class PlayingArmy extends Army
 {
-    Fact motherFact;
+    int motherFact;
 
+    PlayingArmy(int owner)
+    {
+        super(owner);
+    }
     void setNewMotherFactory(Integer id)
     {
     }
 
     public String toString()
     {
-        return motherFact.toString();
+        System.err.println(super.toString() + " M"+motherFact+" w"+weakestFact);
+        return "";
     }
 }
-
+ 
 class BaseFact
 {
     int id;
@@ -221,7 +273,7 @@ class BaseFact
 
     public String toString()
     {
-        return "id " + id;
+        return "id" + id;
     }
 }
 
@@ -248,7 +300,8 @@ class Fact
 
     public String toString()
     {
-        return super.toString() + " residents " + residents + " prod " + prod + "" + moving + arriving + base.neighboursByDistance;
+        System.err.println(base.toString()+"cyb" + residents + "prod" + prod + "" + moving + arriving + base.neighboursByDistance);
+        return "";
     }
 }
 
