@@ -44,7 +44,10 @@ class Player
 
             initTurn(in, newMap);
 
-            System.out.println(engage(oldMap, newMap));
+            Decision dec = engage(oldMap, newMap);
+            
+            dec.sendAll();
+            System.out.println("WAIT");
 
             oldMap = newMap;
         }
@@ -88,13 +91,13 @@ class Player
             switch (entityType)
             {
                 case Player.FACT:
-                    initEntityFact(newUniv, entityId, arg1, arg2, arg3);
+                    initEntityFact(newUniv, entityId, arg1, arg2, arg3, arg4);
                     break;
                 case Player.CYB:
                     initEntityTroop(newUniv, entityId, arg1, arg2, arg3, arg4, arg5);
                     break;
                 case Player.BOMB :
-                	initEntityTroop(newUniv, entityId, arg1, arg2, arg3, arg4, arg5);
+                	initEntityBomb(newUniv, entityId, arg1, arg2, arg3, arg4);
     				break;
                 default:
                     System.err.println("Entity type not recognized!");
@@ -103,12 +106,12 @@ class Player
         }
         findMotherFact(newUniv.myArmy);
         findMotherFact(newUniv.otherArmy);
-        findTargetFact(newUniv.myArmy, new ProductionComparator(newUniv));
-        findTargetFact(newUniv.otherArmy, new ProductionComparator(newUniv));
-        findTargetFact(newUniv.neutralArmy, new ProductionComparator(newUniv));
+        findTargetFact(newUniv.myArmy, new TargetComparator(newUniv));
+        findTargetFact(newUniv.otherArmy, new TargetComparator(newUniv));
+        findTargetFact(newUniv.neutralArmy, new TargetComparator(newUniv));
     }
 
-    static void initEntityFact(Univ newUniv, int id, int owner, int residents, int prod)
+    static void initEntityFact(Univ newUniv, int id, int owner, int residents, int prod, int turnsLeft)
     {
         Fact fact = newUniv.gameFactoriesById.get(id);
         fact.owner = owner;
@@ -129,35 +132,27 @@ class Player
         newUniv.gameFactoriesProductionById.put(id, prod);
     }
 
-    static void initEntityTroop(Univ newUniv, int id, int arg1, int arg2, int arg3, int arg4, int arg5)
+    static void initEntityTroop(Univ newUniv, int id, int owner, int sourceId, int targetId, int cyb, int turnsLeft)
     {
+    	Fact targetFact = newUniv.gameFactoriesById.get(targetId);
+    	Fact sourceFact = newUniv.gameFactoriesById.get(sourceId);
+    	sourceFact.moving += cyb;
+		targetFact.addArriving(owner, cyb, turnsLeft);
     }
     
-    static void initEntityBomb(Univ newUniv, int id, int arg1, int arg2, int arg3, int arg4, int arg5)
+    static void initEntityBomb(Univ newUniv, int id, int arg1, int arg2, int arg3, int arg4)
     {
     }
 
     static void findMotherFact(PlayingArmy army)
     {
-        int id = 0;
-        int max = 0;
-        for (Fact ownFact : army.factories)
-        {
-            if (ownFact.residents > max)
-            {
-                max = ownFact.residents;
-                id = ownFact.base.id;
-            }
-        }
-        army.motherFact = id;
+    	ArrayList<Fact> sortedByRes = (ArrayList<Fact>) army.factories.clone();
+        Collections.sort(sortedByRes, new ResidentComparator());
+        army.motherFact = sortedByRes.get(0).base.id;
     }
 
     static void findTargetFact(Army army, Comparator<Fact> comp)
     {
-        if (army.owner == 0)
-        {
-            army.print();
-        }
         ArrayList<Fact> sortedByProd = (ArrayList<Fact>) army.factories.clone();
         if (sortedByProd.isEmpty())
         {
@@ -166,15 +161,11 @@ class Player
         }
         Collections.sort(sortedByProd, comp);
         army.weakestFact = sortedByProd.get(0).base.id;
-        
-        if (army.owner == 0)
-        {
-            System.err.println("weak" + army.weakestFact);
-        }
     }
 
-    static String engage(Univ oldUniv, Univ newUniv)
+    static Decision engage(Univ oldUniv, Univ newUniv)
     {
+    	Decision result = new Decision();
          //       System.err.println("My " + newUniv.myArmy);
          //       System.err.println("Opp" + newUniv.otherArmy);
          //       System.err.println("Blk" + newUniv.neutralArmy);
@@ -186,28 +177,28 @@ class Player
         {
         	if (newUniv.otherArmy.weakestFact == null || newUniv.myArmy.motherFact == newUniv.otherArmy.weakestFact)
             {
-               return "WAIT";
+               return result.add(new Action());
             }
             else
             {
             	int moving = newUniv.gameFactoriesById.get(newUniv.myArmy.motherFact).residents - 3;
             	if(moving <= 0)
-            		return "WAIT";
-               return "MOVE " + newUniv.myArmy.motherFact + " " + newUniv.otherArmy.weakestFact + " " + moving;
+            		return result.add(new Action());
+               return result.add(new Action(newUniv.myArmy.motherFact, newUniv.otherArmy.weakestFact, moving));
             }         
         }
         else
         {
             if (newUniv.myArmy.motherFact == newUniv.neutralArmy.weakestFact)
             {
-                return "WAIT";
+            	return result.add(new Action());
             }
             else
             {
             	int moving = newUniv.gameFactoriesById.get(newUniv.myArmy.motherFact).residents - 3;
             	if(moving <= 0)
-            		return "WAIT";
-                return "MOVE " + newUniv.myArmy.motherFact + " " + newUniv.neutralArmy.weakestFact + " " + moving;
+            		return result.add(new Action());
+            	return result.add(new Action(newUniv.myArmy.motherFact, newUniv.neutralArmy.weakestFact, moving));
             }
         }
     }
@@ -290,7 +281,7 @@ class Army
 
 class PlayingArmy extends Army
 {
-    int motherFact;
+    Integer motherFact;
 
     PlayingArmy(int owner)
     {
@@ -324,10 +315,10 @@ class Fact
 {
     final BaseFact base;
     int owner = -2;
-    int residents = 0;
+    Integer residents = 0;
     Integer prod = 0;
-    ArrayList<Integer> moving = new ArrayList<>(Player.MAX_MOVING_TIME);
-    ArrayList<Integer> arriving = new ArrayList<>(Player.MAX_MOVING_TIME);
+    Integer moving = 0;
+    HashMap<Integer, Integer> arriving = new HashMap<>(Player.MAX_MOVING_TIME);
 
     Fact(int id)
     {
@@ -339,6 +330,20 @@ class Fact
     {
         this.base = new BaseFact(otherFact.base.id);
         this.base.neighboursByDistance = otherFact.base.neighboursByDistance;
+    }
+    
+    void addArriving(int owner, int arrivings, int turnsLeft)
+    {	
+    	if (arriving.get(turnsLeft) == null)
+    		arriving.put(turnsLeft, 0);
+    	if (this.owner == owner)
+    	{
+    		arriving.put(turnsLeft, arrivings + arriving.get(turnsLeft));
+    	}
+    	else
+    	{
+    		arriving.put(turnsLeft, arrivings - arriving.get(turnsLeft));
+    	}
     }
 
     public void print()
@@ -366,37 +371,70 @@ class Action
 	int qty;
 	void send()
 	{
+		System.out.print(toString());
+	}
+	Action()
+	{
+		base = BASE.WAIT;
+	}
+	Action(Integer source, Integer dest)
+	{
+		base = BASE.BOMB;
+		this.source = source.toString();
+		this.dest = dest.toString();
+	}
+	Action(Integer source, Integer dest, int qty)
+	{
+		base = BASE.MOVE;
+		this.source = source.toString();
+		this.dest = dest.toString();
+		this.qty = qty;
+	}
+	public String toString()
+	{
 		switch (base)
 		{
 			case WAIT :
-				System.out.print("WAIT");
-				break;
+				return "WAIT;";
 			case MOVE :
-				System.out.print("MOVE " + source + " " + dest + " " + qty);
-				break;
+				return "MOVE " + source + " " + dest + " " + qty +";";
 			case BOMB :
-				System.out.print("BOMB " + source + " " + dest);
-				break;
+				return "BOMB " + source + " " + dest +";";
+			default : return "";
 		}
+	}
+	void print()
+	{
+		System.err.println(toString());
 	}
 }
 
 class Decision
 {
-	ArrayList<Action> actions = new ArrayList<>();
+	ArrayList<Action> actions = new ArrayList<>();	
+	Decision add(Action a)
+	{
+		actions.add(a);
+		return this;
+	}
 	
 	void sendAll()
 	{
 		actions.forEach(Action::send);
 	}
+	
+	void print()
+	{
+		actions.forEach(Action::print);
+	}
 }
 
-class ProductionComparator implements Comparator<Fact>
+class TargetComparator implements Comparator<Fact>
 {
 	HashMap<Integer, Set<Integer>> neighboursByDistance;
-	ProductionComparator(Univ univ)
+	TargetComparator(Univ univ)
 	{
-		this.neighboursByDistance = univ.gameFactoriesById.get(univ.myArmy.motherFact).base.neighboursByDistance;
+	   this.neighboursByDistance = univ.gameFactoriesById.get(univ.myArmy.motherFact).base.neighboursByDistance;
 	}
 	
 	@Override
@@ -427,5 +465,13 @@ class ProductionComparator implements Comparator<Fact>
 				return entry.getKey();
 		}
 		return -1;
+	}
+}
+
+class ResidentComparator implements Comparator<Fact>
+{
+	@Override
+	public int compare(Fact o1, Fact o2) {
+		return o2.residents.compareTo(o2.residents);
 	}
 }
