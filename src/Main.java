@@ -25,6 +25,7 @@ class Player
     static final int MAX_PROD_CYB = 3;
     static final String CYB = "TROOP";
     static final String FACT = "FACTORY";
+    static final String BOMB = "BOMB";
 
     // Write an action using System.out.println()
     // To debug: System.err.println("Debug messages...");
@@ -92,6 +93,9 @@ class Player
                 case Player.CYB:
                     initEntityTroop(newUniv, entityId, arg1, arg2, arg3, arg4, arg5);
                     break;
+                case Player.BOMB :
+                	initEntityTroop(newUniv, entityId, arg1, arg2, arg3, arg4, arg5);
+    				break;
                 default:
                     System.err.println("Entity type not recognized!");
                     break;
@@ -126,6 +130,10 @@ class Player
     }
 
     static void initEntityTroop(Univ newUniv, int id, int arg1, int arg2, int arg3, int arg4, int arg5)
+    {
+    }
+    
+    static void initEntityBomb(Univ newUniv, int id, int arg1, int arg2, int arg3, int arg4, int arg5)
     {
     }
 
@@ -196,7 +204,10 @@ class Player
             }
             else
             {
-                return "MOVE " + newUniv.myArmy.motherFact + " " + newUniv.neutralArmy.weakestFact + " " + (newUniv.gameFactoriesById.get(newUniv.myArmy.motherFact).residents -3);
+            	int moving = newUniv.gameFactoriesById.get(newUniv.myArmy.motherFact).residents - 3;
+            	if(moving <= 0)
+            		return "WAIT";
+                return "MOVE " + newUniv.myArmy.motherFact + " " + newUniv.neutralArmy.weakestFact + " " + moving;
             }
         }
     }
