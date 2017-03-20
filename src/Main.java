@@ -7,10 +7,6 @@ import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.Set;
 
-/**
- * Auto-generated code below aims at helping you parse
- * the standard input according to the problem statement.
- **/
 class Player
 {
     static final int MIN_FACT = 7;
@@ -27,9 +23,6 @@ class Player
     static final String FACT = "FACTORY";
     static final String BOMB = "BOMB";
 
-    // Write an action using System.out.println()
-    // To debug: System.err.println("Debug messages...");
-    // Any valid action, such as "WAIT" or "MOVE source destination cyborgs"
     public static void main(String args[])
     {
 
@@ -44,8 +37,12 @@ class Player
 
             initTurn(in, newMap);
 
-            Decision dec = engage(oldMap, newMap);
-            
+            //System.err.println("My " + newUniv.myArmy);
+            //System.err.println("Opp" + newUniv.otherArmy);
+            //System.err.println("Blk" + newUniv.neutralArmy);
+           
+            Decision dec = playTurn(oldMap, newMap);
+           
             dec.sendAll();
             System.out.println("WAIT");
 
@@ -104,11 +101,12 @@ class Player
                     break;
             }
         }
-        findMotherFact(newUniv.myArmy);
-        findMotherFact(newUniv.otherArmy);
-        findTargetFact(newUniv.myArmy, new TargetComparator(newUniv));
-        findTargetFact(newUniv.otherArmy, new TargetComparator(newUniv));
-        findTargetFact(newUniv.neutralArmy, new TargetComparator(newUniv));
+        sortMotherFacts(newUniv.myArmy);
+        sortMotherFacts(newUniv.otherArmy);
+        checkEndangeredFactoy(newUniv.myArmy);
+        sortTargetFacts(newUniv.myArmy, new TargetComparator(newUniv));
+        sortTargetFacts(newUniv.otherArmy, new TargetComparator(newUniv));
+        sortTargetFacts(newUniv.neutralArmy, new TargetComparator(newUniv));
     }
 
     static void initEntityFact(Univ newUniv, int id, int owner, int residents, int prod, int turnsLeft)
@@ -143,64 +141,77 @@ class Player
     static void initEntityBomb(Univ newUniv, int id, int arg1, int arg2, int arg3, int arg4)
     {
     }
-
-    static void findMotherFact(PlayingArmy army)
+    
+    static void checkEndangeredFactoy(PlayingArmy army)
     {
-    	ArrayList<Fact> sortedByRes = (ArrayList<Fact>) army.factories.clone();
-        Collections.sort(sortedByRes, new ResidentComparator());
-        army.motherFact = sortedByRes.get(0).base.id;
+    	army.factories
     }
 
-    static void findTargetFact(Army army, Comparator<Fact> comp)
+    static void sortMotherFacts(PlayingArmy army)
     {
-        ArrayList<Fact> sortedByProd = (ArrayList<Fact>) army.factories.clone();
-        if (sortedByProd.isEmpty())
-        {
-        	army.weakestFact = null;
-        	return;
-        }
-        Collections.sort(sortedByProd, comp);
-        army.weakestFact = sortedByProd.get(0).base.id;
+    	army.motherFacts = (ArrayList<Fact>) army.factories.clone();
+        Collections.sort(army.motherFacts, new ResidentComparator());
     }
 
-    static Decision engage(Univ oldUniv, Univ newUniv)
+    static void sortTargetFacts(Army army, Comparator<Fact> comp)
     {
-    	Decision result = new Decision();
-         //       System.err.println("My " + newUniv.myArmy);
-         //       System.err.println("Opp" + newUniv.otherArmy);
-         //       System.err.println("Blk" + newUniv.neutralArmy);
+        army.weakestFacts = (ArrayList<Fact>) army.factories.clone();
+        Collections.sort(army.weakestFacts, comp);
+    }
+    
+    static Decision playTurn(Univ oldUniv, Univ newUniv)
+    {
+        Decision dec = new Decision();
+    	defend(dec, oldUniv, newUniv);
+        engage(dec, oldUniv, newUniv);
+        return dec;
+    }
+    
+    static Decision defend(Decision result, Univ oldUniv, Univ newUniv)
+    {	
+    	return result;
+    }
 
+    static Decision engage(Decision result, Univ oldUniv, Univ newUniv)
+    {
+    
+    	return result;
+    	/*
         Fact otherTarget = newUniv.gameFactoriesById.get(newUniv.otherArmy.weakestFact);
         Fact neutrTarget = newUniv.gameFactoriesById.get(newUniv.neutralArmy.weakestFact);
         
-        if (newUniv.neutralArmy.factories.isEmpty() || otherTarget.prod > neutrTarget.prod)
+        if (otherTarget == null)
         {
-        	if (newUniv.otherArmy.weakestFact == null || newUniv.myArmy.motherFact == newUniv.otherArmy.weakestFact)
+            return result;
+        }
+        if (newUniv.neutralArmy.factories.isEmpty() || newUniv.findDistance(otherTarget.base.id) <= newUniv.findDistance(neutrTarget.base.id))
+        {
+        	if (newUniv.otherArmy.weakestFact == null || newUniv.myArmy.motherFacts.get(0) == newUniv.otherArmy.weakestFact.get(0))
             {
                return result.add(new Action());
             }
             else
             {
-            	int moving = newUniv.gameFactoriesById.get(newUniv.myArmy.motherFact).residents - 3;
+            	int moving = newUniv.gameFactoriesById.get(newUniv.myArmy.motherFacts.get(0)).residents - 3;
             	if(moving <= 0)
-            		return result.add(new Action());
-               return result.add(new Action(newUniv.myArmy.motherFact, newUniv.otherArmy.weakestFact, moving));
+            		return result;
+               return result.add(new Action(newUniv.myArmy.motherFacts.get(0), newUniv.otherArmy.weakestFact.get(0), moving));
             }         
         }
         else
         {
-            if (newUniv.myArmy.motherFact == newUniv.neutralArmy.weakestFact)
+            if (newUniv.myArmy.motherFacts.get(0) == newUniv.neutralArmy.weakestFact.get(0))
             {
-            	return result.add(new Action());
+            	return result;
             }
             else
             {
-            	int moving = newUniv.gameFactoriesById.get(newUniv.myArmy.motherFact).residents - 3;
+            	int moving = newUniv.gameFactoriesById.get(newUniv.myArmy.motherFacts.get(0)).residents - 3;
             	if(moving <= 0)
-            		return result.add(new Action());
-            	return result.add(new Action(newUniv.myArmy.motherFact, newUniv.neutralArmy.weakestFact, moving));
+            		return result;
+            	return result.add(new Action(newUniv.myArmy.motherFacts.get(0), newUniv.neutralArmy.weakestFact.get(0), moving));
             }
-        }
+        }*/
     }
 }
 
@@ -241,6 +252,17 @@ class Univ
         fact1.base.neighboursByDistance.putIfAbsent(distance, new HashSet<>());
         fact1.base.neighboursByDistance.get(distance).add(fact2.base.id);
     }
+    
+    int findDistance(int id)
+	{
+		HashMap<Integer, Set<Integer>> neighboursByDistance = gameFactoriesById.get(myArmy.motherFacts.get(0)).base.neighboursByDistance;
+		for(Entry<Integer, Set<Integer>> entry : neighboursByDistance.entrySet())
+		{
+			if (entry.getValue().contains(id))
+				return entry.getKey();
+		}
+		return -1;
+	}
 
     public void print()
     {
@@ -264,7 +286,7 @@ class Univ
 class Army
 {
     int owner;
-    Integer weakestFact;
+    ArrayList<Fact> weakestFacts;
     ArrayList<Fact> factories = new ArrayList<>(Player.MAX_FACT);
 
     Army(int owner)
@@ -281,7 +303,7 @@ class Army
 
 class PlayingArmy extends Army
 {
-    Integer motherFact;
+	ArrayList<Fact> motherFacts;
 
     PlayingArmy(int owner)
     {
@@ -291,7 +313,8 @@ class PlayingArmy extends Army
     public void print()
     {
     	super.print();
-        System.err.println("M" + motherFact + "w" + weakestFact);
+        System.err.println("M" + motherFacts);
+        System.err.println("w" + weakestFacts);
     }
 }
 
@@ -311,6 +334,17 @@ class BaseFact
     }
 }
 
+class Danger
+{
+	int turnsLeftBeforeInvasion;
+	int unitsNeeded;
+	Danger(int turns, int unitsNeeded)
+	{
+		this.turnsLeftBeforeInvasion = turns;
+		this.unitsNeeded = unitsNeeded;
+	}
+}
+
 class Fact
 {
     final BaseFact base;
@@ -319,13 +353,14 @@ class Fact
     Integer prod = 0;
     Integer moving = 0;
     HashMap<Integer, Integer> arriving = new HashMap<>(Player.MAX_MOVING_TIME);
+    
 
     Fact(int id)
     {
         base = new BaseFact(id);
     }
 
-    //clone
+    //clone base
     Fact(Fact otherFact)
     {
         this.base = new BaseFact(otherFact.base.id);
@@ -420,6 +455,10 @@ class Decision
 	
 	void sendAll()
 	{
+		if (actions.isEmpty())
+		{
+			actions.add(new Action());
+		}
 		actions.forEach(Action::send);
 	}
 	
@@ -431,40 +470,30 @@ class Decision
 
 class TargetComparator implements Comparator<Fact>
 {
-	HashMap<Integer, Set<Integer>> neighboursByDistance;
+	Univ univ;
 	TargetComparator(Univ univ)
 	{
-	   this.neighboursByDistance = univ.gameFactoriesById.get(univ.myArmy.motherFact).base.neighboursByDistance;
+	   this.univ = univ;
 	}
 	
 	@Override
 	public int compare(Fact fact1, Fact fact2) {
 		int id1 = fact1.base.id;
-		int id2 = fact2.base.id;
-		int d1 = findDistance(id1);
-		int d2 = findDistance(id2);
+		int id2 = fact2.base.id;  
+		int d1 = univ.findDistance(id1);
+		int d2 = univ.findDistance(id2);
 		int res1 = fact1.residents;
 		int res2 = fact2.residents;
 		int prod1 = fact1.prod;
 		int prod2 = fact2.prod;
 		
-		int prodTurns1 = 5-d1;
-		int prodTurns2 = 5-d2;
+		int prodTurns1 = Player.MAX_MOVING_TIME-d1;
+		int prodTurns2 = Player.MAX_MOVING_TIME-d2;
 		
 		Integer profit1 = prod1 * (prodTurns1 < 1 ? 0 : prodTurns1) - res1;
 		Integer profit2 = prod2 * (prodTurns2 < 1 ? 0 : prodTurns2) - res2;
 		
 		return profit2.compareTo(profit1);
-	}
-	
-	private int findDistance(int id)
-	{
-		for(Entry<Integer, Set<Integer>> entry : neighboursByDistance.entrySet())
-		{
-			if (entry.getValue().contains(id))
-				return entry.getKey();
-		}
-		return -1;
 	}
 }
 
@@ -472,6 +501,6 @@ class ResidentComparator implements Comparator<Fact>
 {
 	@Override
 	public int compare(Fact o1, Fact o2) {
-		return o2.residents.compareTo(o2.residents);
+		return o2.residents.compareTo(o1.residents);
 	}
 }
