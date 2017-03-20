@@ -53,9 +53,9 @@ class Player
     static Scanner initGame(Univ oldUniv)
     {
         Scanner in = new Scanner(System.in);
-        int factoryCount = in.nextInt(); // the number of factories
+        int factoryCount = in.nextInt();
         oldUniv.numFact = factoryCount;
-        int linkCount = in.nextInt(); // the number of links between factories
+        int linkCount = in.nextInt();
         for (int i = 0; i < linkCount; i++)
         {
             int factory1 = in.nextInt();
@@ -101,12 +101,13 @@ class Player
                     break;
             }
         }
+        analyzeFactories(newUniv);
         sortMotherFacts(newUniv.myArmy);
         sortMotherFacts(newUniv.otherArmy);
-        checkEndangeredFactoy(newUniv.myArmy);
-        sortTargetFacts(newUniv.myArmy, new TargetComparator(newUniv));
-        sortTargetFacts(newUniv.otherArmy, new TargetComparator(newUniv));
-        sortTargetFacts(newUniv.neutralArmy, new TargetComparator(newUniv));
+        //checkEndangeredFactory(newUniv.myArmy);
+        //sortTargetFacts(newUniv.myArmy, new TargetComparator(newUniv));
+        //sortTargetFacts(newUniv.otherArmy, new TargetComparator(newUniv));
+        //sortTargetFacts(newUniv.neutralArmy, new TargetComparator(newUniv));
     }
 
     static void initEntityFact(Univ newUniv, int id, int owner, int residents, int prod, int turnsLeft)
@@ -142,15 +143,22 @@ class Player
     {
     }
     
-    static void checkEndangeredFactoy(PlayingArmy army)
+    static void analyzeFactories(Univ newUniv)
     {
-    	army.factories
+    	newUniv.myArmy.factories.forEach(fact->fact.setClosest(newUniv.gameFactoriesById, -1));
+    	newUniv.otherArmy.factories.forEach(fact->fact.setClosest(newUniv.gameFactoriesById, 1));
+    	newUniv.myArmy.factories.forEach(fact->System.err.println(fact.base.id+" "+fact.closestEnemies));
+    	newUniv.otherArmy.factories.forEach(fact->System.err.println(fact.base.id+" "+fact.closestEnemies));
+    }
+    
+    static void checkEndangeredFactory(PlayingArmy army)
+    {
     }
 
     static void sortMotherFacts(PlayingArmy army)
     {
     	army.motherFacts = (ArrayList<Fact>) army.factories.clone();
-        Collections.sort(army.motherFacts, new ResidentComparator());
+        Collections.sort(army.motherFacts, new EnemyDistanceComparator());
     }
 
     static void sortTargetFacts(Army army, Comparator<Fact> comp)
@@ -281,6 +289,11 @@ class Univ
         otherArmy.print();
         neutralArmy.print();
     }
+    
+    public void printEnemies()
+    {
+    	myArmy.factories.forEach(f->{System.err.println("id "+f.base.id);System.err.println("closest "+f.closestEnemies);});
+    }
 }
 
 class Army
@@ -318,6 +331,32 @@ class PlayingArmy extends Army
     }
 }
 
+class FactGroup
+{
+	Integer distance = -1;
+	Set<Integer> ids = new HashSet<Integer>();
+	void add(int distance, int id)
+	{
+		this.distance = distance;
+		ids.add(id);
+	}
+	public String toString()
+	{
+		return ""+distance+" : "+ids;
+	}
+}
+
+class Danger
+{
+	int turnsLeftBeforeInvasion;
+	int unitsNeeded;
+	Danger(int turns, int unitsNeeded)
+	{
+		this.turnsLeftBeforeInvasion = turns;
+		this.unitsNeeded = unitsNeeded;
+	}
+}
+
 class BaseFact
 {
     int id;
@@ -334,17 +373,6 @@ class BaseFact
     }
 }
 
-class Danger
-{
-	int turnsLeftBeforeInvasion;
-	int unitsNeeded;
-	Danger(int turns, int unitsNeeded)
-	{
-		this.turnsLeftBeforeInvasion = turns;
-		this.unitsNeeded = unitsNeeded;
-	}
-}
-
 class Fact
 {
     final BaseFact base;
@@ -353,6 +381,7 @@ class Fact
     Integer prod = 0;
     Integer moving = 0;
     HashMap<Integer, Integer> arriving = new HashMap<>(Player.MAX_MOVING_TIME);
+    FactGroup closestEnemies = new FactGroup();
     
 
     Fact(int id)
@@ -378,6 +407,27 @@ class Fact
     	else
     	{
     		arriving.put(turnsLeft, arrivings - arriving.get(turnsLeft));
+    	}
+    }
+    
+    public void setClosest(HashMap<Integer, Fact> facts, int owner)
+    {
+    	boolean adding = false;
+    	for(Entry<Integer, Set<Integer>> factGroup : base.neighboursByDistance.entrySet())
+    	{
+    		if (adding)
+    		{
+    			return;
+    		}
+    		for(Integer id : factGroup.getValue())
+    		{
+    			Fact scannedFact = facts.get(id);
+    			if (scannedFact.owner == owner)
+    			{
+    				adding = true;
+    				closestEnemies.add(factGroup.getKey(), id);
+    			}
+    		}
     	}
     }
 
@@ -502,5 +552,18 @@ class ResidentComparator implements Comparator<Fact>
 	@Override
 	public int compare(Fact o1, Fact o2) {
 		return o2.residents.compareTo(o1.residents);
+	}
+}
+
+class EnemyDistanceComparator implements Comparator<Fact>
+{
+	@Override
+	public int compare(Fact o1, Fact o2) {
+	    int res = o2.closestEnemies.distance.compareTo(o2.closestEnemies.distance) ;
+	    if (res != 0)
+	    {
+	        return res;
+	    }
+		return o2.prod.compareTo(o1.prod);
 	}
 }
