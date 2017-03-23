@@ -22,6 +22,9 @@ class Player {
 	static final String CYB = "TROOP";
 	static final String FACT = "FACTORY";
 	static final String BOMB = "BOMB";
+	static boolean launchBomb = false;
+	static int bombCounter = 2;
+	static int stopLaunching = 5;
 
 	public static void main(String args[]) {
 
@@ -29,6 +32,7 @@ class Player {
 
 		Scanner in = initGame(oldMap);
 
+		
 		// game loop
 		while (true) {
 			Univ newMap = new Univ(oldMap);
@@ -74,6 +78,7 @@ class Player {
 	}
 
 	static void initTurn(Scanner in, Univ newUniv) {
+		Player.stopLaunching--;
 		int entityCount = in.nextInt();
 		for (int i = 0; i < entityCount; i++) {
 			int entityId = in.nextInt();
@@ -139,14 +144,17 @@ class Player {
 		case -1:
 			newUniv.otherArmy.factories.add(fact);
 			newUniv.otherArmy.totalCyb += residents;
+			newUniv.otherArmy.totalProd += prod;
 			break;
 		case 0:
 			newUniv.neutralArmy.factories.add(fact);
 			newUniv.neutralArmy.totalCyb += residents;
+			newUniv.neutralArmy.totalProd += prod;
 			break;
 		case 1:
 			newUniv.myArmy.factories.add(fact);
 			newUniv.myArmy.totalCyb += residents;
+			newUniv.myArmy.totalProd += prod;
 			break;
 		}
 		fact.residents = residents;
@@ -315,7 +323,9 @@ class Player {
 		
 		System.err.println("ME HAVE "+ newUniv.myArmy.totalCyb);
 		System.err.println("OTHER HAVE "+ newUniv.otherArmy.totalCyb);
-		if (newUniv.myArmy.factories.size() >= newUniv.gameFactoriesById.size()/2 && newUniv.myArmy.totalCyb <= newUniv.otherArmy.totalCyb * 3 / 2)
+		if (newUniv.myArmy.factories.size() >= newUniv.gameFactoriesById.size()/2 
+				&& newUniv.myArmy.totalCyb <= newUniv.otherArmy.totalCyb * 3 / 2
+				&& newUniv.myArmy.totalProd < newUniv.myArmy.factories.size() * Player.MAX_PROD_CYB)
 		{
 			System.err.println("DEFEND NOW!!!");
 			for (Fact fact : newUniv.myArmy.factories)
@@ -371,6 +381,11 @@ class Player {
 		{
 			atack.add(new Action(source.base.id));
 			source.toMove += 10;
+		}
+		if (source.prod < Player.MAX_PROD_CYB)
+		{
+			return;
+					
 		}
 		int troops = source.opportunity.units - source.toMove;
 		if (troops > 0)
@@ -488,6 +503,7 @@ class Univ {
 class Army {
 	int owner;
 	int totalCyb;
+	int totalProd;
 	HashMap<Fact, ArrayList<Fact>> weakestFacts = new HashMap<>();
 	ArrayList<Fact> factories = new ArrayList<>(Player.MAX_FACT);
 
@@ -616,8 +632,15 @@ class Fact {
 			for (Integer id : factGroup.getValue()) {
 				Fact scannedFact = facts.get(id);
 				if (scannedFact.owner == owner) {
+					int dist = factGroup.getKey();
+					closestEnemies.add(dist, id);
+					if (!adding && this.owner == -1 && this.prod ==3 && Player.bombCounter > 0 && Player.stopLaunching > 0)
+					{
+						new Action(id, this.base.id).send();
+						Player.stopLaunching = 5;
+						Player.bombCounter--;
+					}
 					adding = true;
-					closestEnemies.add(factGroup.getKey(), id);
 				}
 			}
 		}
