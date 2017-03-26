@@ -634,7 +634,7 @@ class Fact {
 				if (scannedFact.owner == owner) {
 					int dist = factGroup.getKey();
 					closestEnemies.add(dist, id);
-					if (!adding && this.owner == -1 && this.prod ==3 && Player.bombCounter > 0 && Player.stopLaunching > 0)
+					if (!adding && this.owner == -1 && this.prod ==3 && Player.bombCounter > 0 && Player.stopLaunching < 0)
 					{
 						new Action(id, this.base.id).send();
 						Player.stopLaunching = 5;
