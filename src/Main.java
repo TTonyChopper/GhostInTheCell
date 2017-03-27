@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.Set;
 
+@SuppressWarnings("unchecked")
 class Player {
 	static final int MIN_FACT = 7;
 	static final int MAX_FACT = 15;
@@ -23,16 +24,16 @@ class Player {
 	static final String FACT = "FACTORY";
 	static final String BOMB = "BOMB";
 	static boolean launchBomb = false;
-	static int bombCounter = 2;
+	static int bombCounter;
 	static int stopLaunching = 5;
 
 	public static void main(String args[]) {
+		bombCounter = 2;
 
 		Univ oldMap = new Univ();
 
 		Scanner in = initGame(oldMap);
 
-		
 		// game loop
 		while (true) {
 			Univ newMap = new Univ(oldMap);
@@ -42,7 +43,7 @@ class Player {
 			// System.err.println("My " + newUniv.myArmy);
 			// System.err.println("Opp" + newUniv.otherArmy);
 			// System.err.println("Blk" + newUniv.neutralArmy);
-			
+
 			Decision dec = null;
 			try {
 				dec = playTurn(oldMap, newMap);
@@ -64,17 +65,13 @@ class Player {
 		int linkCount = in.nextInt();
 		for (int i = 0; i < linkCount; i++) {
 			int factory1 = in.nextInt();
-			addFactIfNotExist(oldUniv, factory1);
+			oldUniv.gameFactoriesById.putIfAbsent(factory1, new Fact(factory1));
 			int factory2 = in.nextInt();
-			addFactIfNotExist(oldUniv, factory2);
+			oldUniv.gameFactoriesById.putIfAbsent(factory2, new Fact(factory2));
 			int distance = in.nextInt();
 			oldUniv.setLink(factory1, factory2, distance);
 		}
 		return in;
-	}
-
-	static void addFactIfNotExist(Univ oldUniv, int factId) {
-		oldUniv.gameFactoriesById.putIfAbsent(factId, new Fact(factId));
 	}
 
 	static void initTurn(Scanner in, Univ newUniv) {
@@ -99,7 +96,6 @@ class Player {
 				initEntityBomb(newUniv, entityId, arg1, arg2, arg3, arg4);
 				break;
 			default:
-				System.err.println("Entity type not recognized!");
 				break;
 			}
 		}
@@ -125,7 +121,7 @@ class Player {
 				}
 			}
 		});
-		
+
 		for (Fact source : newUniv.myArmy.motherFacts) {
 			sortTargetFacts(newUniv.myArmy, new TargetComparator(newUniv,
 					source));
@@ -158,8 +154,15 @@ class Player {
 			break;
 		}
 		fact.residents = residents;
-		fact.intermediateResidents = residents;
-		fact.prod = prod;
+		fact.turnsLeftBomb = turnsLeft;
+		if (turnsLeft > 0)
+		{
+			fact.prod = 0;
+		}
+		else 
+		{
+			fact.prod = prod;
+		}
 		newUniv.gameFactoriesProductionById.put(id, prod);
 	}
 
@@ -195,7 +198,7 @@ class Player {
 	static void sortMotherFacts(PlayingArmy army) {
 		army.motherFacts = (ArrayList<Fact>) army.factories.clone();
 		Collections.sort(army.motherFacts, new EnemyDistanceComparator());
-		//System.err.println("MOTHERS " + army.motherFacts);
+		// System.err.println("MOTHERS " + army.motherFacts);
 	}
 
 	static void checkOpportunitiesOnFactories(PlayingArmy army) {
@@ -228,7 +231,7 @@ class Player {
 		army.weakestFacts.put(comp.sourceFact, cloneFacts);
 		Collections.sort(cloneFacts, comp);
 	}
-
+	
 	static void sortTargetFacts(PlayingArmy otherArmy, Army neutralArmy,
 			TargetComparator comp) {
 		ArrayList<Fact> cloneFacts = (ArrayList<Fact>) otherArmy.factories
@@ -262,7 +265,7 @@ class Player {
 		}
 		reorganizeForcesToDefend(defend, newUniv, endangeredFactories,
 				safeFactories);
-		//defend.print();
+		// defend.print();
 		return defend;
 	}
 
@@ -276,19 +279,17 @@ class Player {
 		result.add(new Action("Def" + def[0] + " Atk" + atk[0]));
 
 		for (Fact fact : newUniv.myArmy.motherFacts) {
-			if (fact.residents >= 10 && fact.prod < 3)
-			{
-				if (!newUniv.myArmy.weakestFacts.get(fact).isEmpty())
-				{
-					if (fact.equals(newUniv.myArmy.weakestFacts.get(fact).get(0)))
-					{
+			if (fact.residents >= 10 && fact.prod < MAX_PROD_CYB) {
+				if (!newUniv.myArmy.weakestFacts.get(fact).isEmpty()) {
+					if (fact.equals(newUniv.myArmy.weakestFacts.get(fact)
+							.get(0))) {
 						result.add(new Action(fact.base.id));
 						fact.toMove = 10;
 					}
 				}
 			}
-			//System.err.println("DEFEND from " + fact.base.id);
-			//System.err.println("DEFEND from candidates" + toRelocate);
+			// System.err.println("DEFEND from " + fact.base.id);
+			// System.err.println("DEFEND from candidates" + toRelocate);
 			if (toRelocate.contains(fact)) {
 				generateDefMove(result, fact, toDefend);
 			}
@@ -320,24 +321,22 @@ class Player {
 		newUniv.myArmy.printTargets();
 		newUniv.otherArmy.printTargets();
 		newUniv.neutralArmy.printTargets();
-		
-		System.err.println("ME HAVE "+ newUniv.myArmy.totalCyb);
-		System.err.println("OTHER HAVE "+ newUniv.otherArmy.totalCyb);
-		if (newUniv.myArmy.factories.size() >= newUniv.gameFactoriesById.size()/2 
-				&& newUniv.myArmy.totalCyb <= newUniv.otherArmy.totalCyb * 3 / 2
-				&& newUniv.myArmy.totalProd < newUniv.myArmy.factories.size() * Player.MAX_PROD_CYB)
-		{
+
+		//System.err.println("ME HAVE " + newUniv.myArmy.totalCyb);
+		//System.err.println("OTHER HAVE " + newUniv.otherArmy.totalCyb);
+		if (newUniv.myArmy.factories.size() >= newUniv.gameFactoriesById.size() / 2
+				&& newUniv.myArmy.totalCyb <= newUniv.otherArmy.totalCyb * 4 / 3
+				&& newUniv.myArmy.totalProd < newUniv.myArmy.factories.size()
+						* Player.MAX_PROD_CYB) {
 			System.err.println("DEFEND NOW!!!");
-			for (Fact fact : newUniv.myArmy.factories)
-			{
-				if (fact.opportunity.isGoodOmen)
-				{
+			for (Fact fact : newUniv.myArmy.factories) {
+				if (fact.opportunity.isGoodOmen) {
 					redistribute(atack, fact);
 				}
 			}
 			return atack;
 		}
-		
+
 		for (Fact source : newUniv.myArmy.motherFacts) {
 			if (!newUniv.neutralArmy.weakestFacts.get(source).isEmpty()) {
 				for (int i = 0; i < newUniv.neutralArmy.weakestFacts
@@ -367,42 +366,37 @@ class Player {
 				}
 			}
 		}
-		//atack.print();
+		// atack.print();
 		return atack;
 	}
-	
-	static void redistribute(Decision atack, Fact source)
-	{
-		System.err.println("redistrib for "+source);
+
+	static void redistribute(Decision atack, Fact source) {
+		System.err.println("redistrib for " + source);
 		if (source.toMove >= source.opportunity.units) {
-			return ;
+			return;
 		}
-		if (source.opportunity.units >= 10)
-		{
+		if (source.opportunity.units >= 10) {
 			atack.add(new Action(source.base.id));
 			source.toMove += 10;
 		}
-		if (source.prod < Player.MAX_PROD_CYB)
-		{
+		if (source.prod < Player.MAX_PROD_CYB) {
 			return;
-					
+
 		}
 		int troops = source.opportunity.units - source.toMove;
-		if (troops > 0)
-		{
+		if (troops > 0) {
 			Set<Integer> ids = new HashSet<>();
-			Iterator<Set<Integer>> it = source.base.neighboursByDistance.values().iterator();
-			for (int i = 0;i<2 && it.hasNext();i++)
-			{
+			Iterator<Set<Integer>> it = source.base.neighboursByDistance
+					.values().iterator();
+			for (int i = 0; i < 2 && it.hasNext(); i++) {
 				ids.addAll(it.next());
 			}
-			System.err.println("IDS " +ids);
-			for (int id : ids)
-			{
-				int division = troops/ids.size();
+			System.err.println("IDS " + ids);
+			for (int id : ids) {
+				int division = troops / ids.size();
 				atack.add(new Action(source.base.id, id, division));
 				source.toMove += division;
-			}	
+			}
 		}
 	}
 
@@ -423,11 +417,6 @@ class Player {
 				}
 			}
 		}
-		return result;
-	}
-
-	static Decision reorganizeForces(Decision result, ArrayList<Fact> toDefend,
-			ArrayList<Fact> toRelocate) throws CannotDecideException {
 		return result;
 	}
 }
@@ -595,10 +584,10 @@ class Fact {
 	final BaseFact base;
 	int owner = -2;
 	Integer residents = 0;
-	Integer intermediateResidents = 0;
 	Integer prod = 0;
 	Integer moving = 0;
 	int toMove = 0;
+	int turnsLeftBomb = -1;
 	HashMap<Integer, Integer> arriving = new HashMap<>(Player.MAX_MOVING_TIME);
 	FactGroup closestEnemies = new FactGroup();
 	Opportunity opportunity = null;
@@ -634,8 +623,9 @@ class Fact {
 				if (scannedFact.owner == owner) {
 					int dist = factGroup.getKey();
 					closestEnemies.add(dist, id);
-					if (!adding && this.owner == -1 && this.prod ==3 && Player.bombCounter > 0 && Player.stopLaunching < 0)
-					{
+					if (!adding && this.owner == -1 && this.prod == Player.MAX_PROD_CYB
+							&& Player.bombCounter > 0
+							&& Player.stopLaunching < 0) {
 						new Action(id, this.base.id).send();
 						Player.stopLaunching = 5;
 						Player.bombCounter--;
@@ -686,7 +676,7 @@ class Action {
 		base = BASE.INC;
 		qty = id;
 	}
-	
+
 	Action(String msg) {
 		base = BASE.MSG;
 		source = msg;
@@ -720,7 +710,7 @@ class Action {
 		case MSG:
 			return "MSG " + source + ";";
 		case INC:
-			return "INC " + qty + ";";	
+			return "INC " + qty + ";";
 		default:
 			return "";
 		}
@@ -773,21 +763,30 @@ class TargetComparator implements Comparator<Fact> {
 
 	@Override
 	public int compare(Fact fact1, Fact fact2) {
+		int prod1 = fact1.prod;
+		int prod2 = fact2.prod;
+
+		if (prod1 == 0 && fact1.turnsLeftBomb > 0)
+		{
+			return 1;
+		}
+		else if(prod2 == 0 && fact2.turnsLeftBomb > 0)
+		{
+			return -1;
+		}
+		
 		int id1 = fact1.base.id;
 		int id2 = fact2.base.id;
 		int d1 = univ.findDistanceFromSource(sourceFact, id1);
 		int d2 = univ.findDistanceFromSource(sourceFact, id2);
 		int res1 = fact1.residents;
 		int res2 = fact2.residents;
-		int prod1 = fact1.prod;
-		int prod2 = fact2.prod;
 
 		int prodTurns1 = Player.MAX_MOVING_TIME / 2 - d1;
 		int prodTurns2 = Player.MAX_MOVING_TIME / 2 - d2;
 
 		Integer profit1 = prod1 * (prodTurns1 < 1 ? 0 : prodTurns1) - res1;
 		Integer profit2 = prod2 * (prodTurns2 < 1 ? 0 : prodTurns2) - res2;
-
 		return profit2.compareTo(profit1);
 	}
 }
@@ -811,5 +810,6 @@ class EnemyDistanceComparator implements Comparator<Fact> {
 	}
 }
 
+@SuppressWarnings("serial")
 class CannotDecideException extends Exception {
 }
